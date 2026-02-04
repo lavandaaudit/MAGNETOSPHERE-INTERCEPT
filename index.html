@@ -1,0 +1,922 @@
+<!DOCTYPE html>
+<html lang="uk">
+
+<head>
+    <meta charset="UTF-8">
+    <title>IBONARIUM · MAGNETOSPHERE INTERCEPT · 2026</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <style>
+        /* ------------------------------------------------------------------
+           CORE INTERFACE - AURORA / GEOMAG AESTHETIC (PURPLE/GREEN)
+           ------------------------------------------------------------------ */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        ::-webkit-scrollbar {
+            width: 0px;
+        }
+
+        body {
+            background: #020005;
+            /* Deep Void Purple */
+            color: #d0f;
+            font-family: 'Courier New', monospace;
+            overflow-x: hidden;
+            min-height: 100vh;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        canvas#bg-layer {
+            position: fixed;
+            inset: 0;
+            z-index: 1;
+            pointer-events: none;
+        }
+
+        .app-container {
+            position: relative;
+            z-index: 10;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 100%;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .brand-header {
+            font-size: 10px;
+            color: #a0f;
+            text-transform: lowercase;
+            letter-spacing: 6px;
+            margin-bottom: 25px;
+            opacity: 0.8;
+            position: relative;
+            z-index: 50;
+            text-shadow: 0 0 15px rgba(200, 0, 255, 0.4);
+            text-align: center;
+            width: 100%;
+        }
+
+        /* ------------------------------------------------------------------
+           MASTER HUB LAYOUT
+           ------------------------------------------------------------------ */
+        .master-hub {
+            display: flex;
+            flex-direction: row;
+            justify-content: center;
+            gap: 40px;
+            width: 100%;
+            max-width: 1200px;
+            flex-wrap: wrap;
+            align-items: flex-start;
+        }
+
+        /* LEFT SIDE - RADAR ANALYTICS */
+        .left-hub {
+            width: 500px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            align-items: center;
+            position: relative;
+            z-index: 50;
+        }
+
+        .radar-header {
+            width: 100%;
+            display: flex;
+            justify-content: space-between;
+            border-bottom: 1px solid rgba(200, 0, 255, 0.2);
+            padding-bottom: 5px;
+            margin-bottom: 5px;
+        }
+
+        .rh-title {
+            font-size: 11px;
+            color: #d0f;
+            font-weight: bold;
+            text-shadow: 0 0 5px #d0f;
+        }
+
+        .rh-sub {
+            font-size: 9px;
+            color: #85a;
+        }
+
+        .radar-box {
+            position: relative;
+            width: 100%;
+            height: 500px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: radial-gradient(circle at center, rgba(30, 0, 50, 0.3) 0%, rgba(0, 0, 0, 0) 70%);
+        }
+
+        canvas#radar-canvas {
+            width: 500px;
+            height: 500px;
+            filter: drop-shadow(0 0 30px rgba(200, 0, 255, 0.1));
+        }
+
+        .radar-info-panel {
+            width: 100%;
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 15px;
+            background: rgba(10, 0, 20, 0.8);
+            border: 1px solid rgba(200, 0, 255, 0.2);
+            padding: 15px;
+            margin-top: -10px;
+            backdrop-filter: blur(5px);
+        }
+
+        .info-block-title {
+            color: #e5f;
+            font-size: 10px;
+            text-transform: uppercase;
+            margin-bottom: 8px;
+            border-left: 3px solid #d0f;
+            padding-left: 8px;
+            font-weight: bold;
+        }
+
+        .mag-legend-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 4px;
+            margin-top: 5px;
+        }
+
+        .leg-col {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 3px;
+        }
+
+        .r-tag {
+            font-weight: bold;
+            font-size: 9px;
+            padding: 2px 0;
+            width: 100%;
+            text-align: center;
+            color: #000;
+            border-radius: 2px;
+        }
+
+        .leg-lbl {
+            font-size: 7px;
+            color: #85a;
+            text-transform: uppercase;
+        }
+
+        .current-status-desc {
+            font-size: 11px;
+            color: #eaf;
+            line-height: 1.5;
+            margin-bottom: 8px;
+            min-height: 32px;
+        }
+
+        .impact-list {
+            list-style: none;
+            padding: 0;
+        }
+
+        .impact-list li {
+            color: #0fa;
+            /* Aurora Green highlights */
+            font-size: 10px;
+            margin-bottom: 3px;
+            padding-left: 10px;
+            position: relative;
+        }
+
+        .impact-list li::before {
+            content: "»";
+            position: absolute;
+            left: 0;
+            color: #d0f;
+        }
+
+        /* RIGHT SIDE - VISUALS & METRICS */
+        .right-hub {
+            width: 380px;
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+            align-items: flex-start;
+            position: relative;
+            z-index: 50;
+        }
+
+        #cosmic-status-line {
+            font-size: 9px;
+            color: #d0f;
+            opacity: 0.8;
+            letter-spacing: 1px;
+            border-bottom: 1px solid rgba(200, 0, 255, 0.2);
+            padding-bottom: 4px;
+            width: 100%;
+        }
+
+        #mag-hud {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 8px 12px;
+            width: 100%;
+        }
+
+        .hud-item {
+            font-size: 10px;
+            text-transform: uppercase;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(140, 0, 255, 0.05);
+            padding: 6px 10px;
+            border-left: 2px solid #508;
+            transition: all 0.3s ease;
+        }
+
+        .hud-item:hover {
+            background: rgba(140, 0, 255, 0.15);
+            border-left-color: #d0f;
+        }
+
+        .hud-label {
+            color: #85a;
+            font-size: 9px;
+        }
+
+        .hud-val {
+            color: #eaf;
+            font-weight: bold;
+        }
+
+        /* Kp Colors */
+        .kp-low {
+            color: #0fa;
+            text-shadow: 0 0 5px #0fa;
+        }
+
+        /* Green */
+        .kp-med {
+            color: #fa0;
+            text-shadow: 0 0 5px #fa0;
+        }
+
+        /* Yellow */
+        .kp-high {
+            color: #f40;
+            text-shadow: 0 0 8px #f40;
+        }
+
+        /* Orange */
+        .kp-ext {
+            color: #f04;
+            text-shadow: 0 0 10px #f04;
+            animation: pulse-fast 0.5s infinite;
+        }
+
+        /* Red */
+
+        .aurora-box {
+            position: relative;
+            width: 260px;
+            height: 260px;
+            background: transparent;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin: 15px 0;
+            align-self: center;
+            border: 1px solid rgba(200, 0, 255, 0.1);
+            border-radius: 50%;
+            overflow: hidden;
+            box-shadow: 0 0 30px rgba(100, 255, 100, 0.05);
+        }
+
+        /* Aurora Simulation */
+        canvas#aurora-canvas {
+            width: 100%;
+            height: 100%;
+            background: #000;
+            border-radius: 50%;
+        }
+
+        #stats-panel {
+            font-size: 10px;
+            color: #a8d;
+            line-height: 1.3;
+            width: 100%;
+            border-top: 1px solid rgba(200, 0, 255, 0.2);
+            padding-top: 10px;
+            margin-top: 5px;
+            max-height: 220px;
+            overflow-y: auto;
+        }
+
+        .cat-title {
+            margin: 12px 0 6px 0;
+            font-size: 9px;
+            color: #d0f;
+            font-weight: bold;
+            text-transform: uppercase;
+            border-bottom: 1px dashed #508;
+            display: flex;
+            justify-content: space-between;
+            padding-bottom: 2px;
+        }
+
+        .stat-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 3px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+        }
+
+        /* ALERTS */
+        #alert-hub {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            z-index: 1000;
+            pointer-events: none;
+        }
+
+        #clock-overlay {
+            position: fixed;
+            bottom: 15px;
+            right: 20px;
+            font-size: 10px;
+            color: #d0f;
+            opacity: 0.6;
+            text-align: right;
+            pointer-events: none;
+            font-weight: bold;
+        }
+
+        @keyframes pulse-fast {
+
+            0%,
+            100% {
+                transform: scale(1);
+                opacity: 1;
+            }
+
+            50% {
+                transform: scale(1.05);
+                opacity: 0.8;
+            }
+        }
+
+        /* RESPONSIVE */
+        @media (max-width: 950px) {
+            .master-hub {
+                flex-direction: column-reverse;
+                align-items: center;
+                gap: 30px;
+            }
+
+            .left-hub,
+            .right-hub {
+                width: 100%;
+                max-width: 100%;
+            }
+
+            .radar-box {
+                height: auto;
+                aspect-ratio: 1/1;
+            }
+
+            canvas#radar-canvas {
+                width: 100%;
+                height: 100%;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <canvas id="bg-layer"></canvas>
+    <div id="alert-hub"></div>
+
+    <div class="app-container">
+        <div class="brand-header">ibonarium.magnetosphere.monitor.v1</div>
+
+        <div class="master-hub">
+
+            <!-- LEFT COLUMN: RADAR (Kp-Index) -->
+            <div class="left-hub">
+                <div class="radar-header">
+                    <span class="rh-title">RADAR: PLANETARY K-INDEX (Kp)</span>
+                    <span class="rh-sub">GEOMAGNETIC STORMS · 7-DAY HISTORY</span>
+                </div>
+
+                <div class="radar-box">
+                    <canvas id="radar-canvas"></canvas>
+                </div>
+
+                <div class="radar-info-panel">
+                    <div>
+                        <div class="info-block-title">СТАН МАГНІТОСФЕРИ</div>
+                        <div class="current-status-desc" id="status-desc-text">
+                            СКАНИРОВАННЯ ПОЛЯ...
+                        </div>
+                        <ul class="impact-list" id="impact-list">
+                            <li>Геомагнітний шторм: ---</li>
+                            <li>Ймовірність Аврори: ---</li>
+                        </ul>
+                    </div>
+
+                    <div>
+                        <div class="info-block-title">ШКАЛА КП-ІНДЕКСУ</div>
+                        <div class="mag-legend-grid">
+                            <div class="leg-col">
+                                <span class="r-tag" style="background:#0f8"> Kp 0-3 </span>
+                                <span class="leg-lbl">QUIET</span>
+                            </div>
+                            <div class="leg-col">
+                                <span class="r-tag" style="background:#fa0"> Kp 4-5 </span>
+                                <span class="leg-lbl">UNSET</span>
+                            </div>
+                            <div class="leg-col">
+                                <span class="r-tag" style="background:#f40"> Kp 6-7 </span>
+                                <span class="leg-lbl">STORM</span>
+                            </div>
+                            <div class="leg-col">
+                                <span class="r-tag" style="background:#f04"> Kp 8-9 </span>
+                                <span class="leg-lbl">EXTREME</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- RIGHT COLUMN: METRICS -->
+            <div class="right-hub">
+                <div id="cosmic-status-line">REAL-TIME FIELD TELEMETRY</div>
+
+                <div id="mag-hud">
+                    <div class="hud-item"><span class="hud-label">Kp INDEX</span> <span class="hud-val"
+                            id="val-kp">---</span></div>
+                    <div class="hud-item"><span class="hud-label">AURORA (GW)</span> <span class="hud-val"
+                            id="val-power">---</span></div>
+                    <div class="hud-item"><span class="hud-label">Bz (nT)</span> <span class="hud-val"
+                            id="val-bz">---</span></div>
+                    <div class="hud-item"><span class="hud-label">G-SCALE</span> <span class="hud-val"
+                            id="val-gscale">---</span></div>
+                    <div class="hud-item"><span class="hud-label">WIND (KM/S)</span> <span class="hud-val"
+                            id="val-wind">---</span></div>
+                    <div class="hud-item"><span class="hud-label">DST (nT)</span> <span class="hud-val"
+                            id="val-dst">---</span></div>
+                </div>
+
+                <div class="aurora-box">
+                    <canvas id="aurora-canvas"></canvas>
+                </div>
+
+                <div style="font-size:9px; color:#85a; text-align:center;">SIMULATION: AURORA BOREALIS INTENSITY</div>
+
+                <div id="stats-panel">
+                    <div style="text-align:center; padding:10px; color:#555;">ОТРИМАННЯ ІСТОРІЇ (7 ДНІВ)...</div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <div id="clock-overlay">INIT</div>
+
+    <script>
+        const PROXY = 'https://corsproxy.io/?';
+        const NOAA_K_REALTIME = 'https://services.swpc.noaa.gov/products/noaa-planetary-k-index.json';
+        const NOAA_PLASMA_7D = 'https://services.swpc.noaa.gov/products/solar-wind/plasma-7-day.json';
+        const NOAA_MAG_7D = 'https://services.swpc.noaa.gov/products/solar-wind/mag-7-day.json';
+        // Forecasted Kp could be used, but we use realtime estimated K for "Now"
+
+        // STATE
+        const STATE = {
+            kp: 0,
+            power: 0, // Hemispheric power
+            bz: 0,
+            wind: 0,
+            gScale: 0,
+            history: [], // {time, kp}
+            status: 'QUIET'
+        };
+
+        // Canvas
+        const bgC = document.getElementById('bg-layer'); const bgCtx = bgC.getContext('2d');
+        const rdC = document.getElementById('radar-canvas'); const rdCtx = rdC.getContext('2d');
+        const arC = document.getElementById('aurora-canvas'); const arCtx = arC.getContext('2d');
+
+        function resize() {
+            const r = window.devicePixelRatio || 1;
+            bgC.width = window.innerWidth * r; bgC.height = window.innerHeight * r;
+
+            const box = document.querySelector('.radar-box');
+            if (box) {
+                rdC.width = box.clientWidth * r; rdC.height = box.clientHeight * r;
+            }
+            const aBox = document.querySelector('.aurora-box');
+            if (aBox) {
+                arC.width = aBox.clientWidth * r; arC.height = aBox.clientHeight * r;
+            }
+
+            bgCtx.scale(r, r); rdCtx.scale(r, r); arCtx.scale(r, r);
+        }
+        window.addEventListener('resize', resize);
+
+        // DATA FETCH
+        async function fetchData() {
+            try {
+                // Fetch Realtime Kp (NOAA Planetary K)
+                const rKp = await fetch(NOAA_K_REALTIME);
+                const kpRaw = await rKp.json(); // [time, kp, a_running, station_count]
+
+                // Fetch Wind for Context
+                const rPl = await fetch(NOAA_PLASMA_7D);
+                const plRaw = await rPl.json();
+
+                const rMg = await fetch(NOAA_MAG_7D);
+                const mgRaw = await rMg.json();
+
+                // Process Latest Kp
+                // NOAA Kp is usually 3-hour blocks, but lists updates.
+                // Format: [time_tag, kp, a_running, station_count]
+                const latestK = kpRaw[kpRaw.length - 1];
+                STATE.kp = parseFloat(latestK[1]);
+
+                // Process Wind/Mag
+                const latestP = plRaw[plRaw.length - 1];
+                const latestM = mgRaw[mgRaw.length - 1];
+                STATE.wind = parseFloat(latestP[2]);
+                STATE.bz = parseFloat(latestM[3]);
+
+                // Estimate G-Scale
+                // G1=Kp5, G2=Kp6, G3=Kp7, G4=Kp8, G5=Kp9
+                if (STATE.kp >= 9) STATE.gScale = 5;
+                else if (STATE.kp >= 8) STATE.gScale = 4;
+                else if (STATE.kp >= 7) STATE.gScale = 3;
+                else if (STATE.kp >= 6) STATE.gScale = 2;
+                else if (STATE.kp >= 5) STATE.gScale = 1;
+                else STATE.gScale = 0;
+
+                // Estimate Power (GW) - Rough correlation to Kp
+                // Kp 0 ~ 5-10GW, Kp 9 ~ 300GW+
+                // Power map: 0->5, 1->15, 2->30, 3->50, 4->80, 5->120...
+                const k = Math.round(STATE.kp);
+                const gwMap = [8, 15, 25, 40, 65, 90, 150, 250, 400, 600];
+                STATE.power = gwMap[k] || 10;
+
+                // Build History for Radar (Kp over 7 days is sparse, usually every 3h)
+                // We need to interpolate or just show blocks.
+                // NOAA K-index json has good history length?
+                // It usually has last few days. 
+                // Let's use it as is.
+                const history = [];
+                // Reverse iterate to fill
+                for (let i = 1; i < kpRaw.length; i++) {
+                    const row = kpRaw[i];
+                    history.push({
+                        time: new Date(row[0]),
+                        kp: parseFloat(row[1])
+                    });
+                }
+                STATE.history = history;
+
+                updateHUD();
+                updateInfo();
+                checkAlerts();
+                generateStats();
+
+            } catch (e) {
+                console.error("Data Fetch Error", e);
+                // Fallback
+                if (STATE.history.length === 0) {
+                    STATE.kp = 2; STATE.wind = 450; STATE.bz = -3;
+                }
+            }
+        }
+
+        function updateHUD() {
+            const kEl = document.getElementById('val-kp');
+            kEl.innerText = STATE.kp.toFixed(1);
+
+            // Color code Kp
+            if (STATE.kp >= 5) kEl.className = 'hud-val kp-ext';
+            else if (STATE.kp >= 4) kEl.className = 'hud-val kp-high';
+            else kEl.className = 'hud-val kp-low';
+
+            document.getElementById('val-power').innerText = STATE.power + ' GW';
+            document.getElementById('val-bz').innerText = STATE.bz.toFixed(1);
+            document.getElementById('val-wind').innerText = STATE.wind.toFixed(0);
+
+            // G-Scale display
+            const gEl = document.getElementById('val-gscale');
+            if (STATE.gScale > 0) {
+                gEl.innerText = 'G' + STATE.gScale;
+                gEl.style.color = '#f04';
+                gEl.style.textShadow = '0 0 10px #f00';
+            } else {
+                gEl.innerText = 'NONE';
+                gEl.style.color = '#0fa';
+                gEl.style.textShadow = 'none';
+            }
+
+            // Est DST (Rough)
+            const dst = (STATE.kp * -15) + 10; // Very rough approx
+            document.getElementById('val-dst').innerText = `~${dst.toFixed(0)}`;
+        }
+
+        function updateInfo() {
+            const desc = document.getElementById('status-desc-text');
+            const list = document.getElementById('impact-list');
+
+            let txt = '', impacts = [];
+
+            if (STATE.kp >= 6) {
+                txt = "СИЛЬНИЙ ГЕОМАГНІТНИЙ ШТОРМ (STRONG).";
+                impacts = ["Аврора можлива на широті Києва", "Проблеми з електромережами", "GPS похибки"];
+                desc.style.color = '#f04';
+            } else if (STATE.kp >= 5) {
+                txt = "ПОМІРНИЙ ШТОРМ (MINOR STORM).";
+                impacts = ["Аврора на півночі", "Коливання напруги"];
+                desc.style.color = '#fa0';
+            } else if (STATE.kp >= 4) {
+                txt = "ЗБУРЕНА МАГНІТОСФЕРА (UNSET).";
+                impacts = ["Полярні сяйва активні", "Умови нестабільні"];
+                desc.style.color = '#fb0';
+            } else {
+                txt = "СПОКІЙНЕ МАГНІТНЕ ПОЛЕ (QUIET).";
+                impacts = ["Без загроз", "Аврора лише на полюсах"];
+                desc.style.color = '#0fa';
+            }
+
+            desc.innerText = txt;
+            list.innerHTML = impacts.map(i => `<li>${i}</li>`).join('');
+        }
+
+        function generateStats() {
+            const p = document.getElementById('stats-panel');
+            let html = '<div class="cat-title"><span>RECENT MAX Kp</span> <span>VALUE</span></div>';
+
+            // Show last few readings reversed
+            const rec = [...STATE.history].reverse().slice(0, 7);
+
+            rec.forEach(r => {
+                const dateStr = r.time.toISOString().split('T');
+                const tStr = dateStr[1].slice(0, 5);
+                const dStr = dateStr[0].slice(5);
+
+                const v = r.kp;
+                let c = '#0fa';
+                if (v >= 4) c = '#fa0'; if (v >= 5) c = '#f40'; if (v >= 7) c = '#f04';
+
+                html += `<div class="stat-row">
+                    <span class="stat-date">${dStr} ${tStr}</span>
+                    <span style="color:${c}; font-weight:bold">${v}</span>
+                </div>`;
+            });
+            p.innerHTML = html;
+        }
+
+        let alertState = false;
+        function checkAlerts() {
+            const isStorm = STATE.kp >= 5;
+            const alertBox = document.getElementById('alert-hub');
+            if (isStorm) {
+                if (!alertState) {
+                    alertBox.innerHTML = `
+                        <div style="background:#f04; color:#fff; padding:10px; border:2px solid #fff; font-weight:bold; box-shadow:0 0 20px #f04;">
+                            ⚠️ GEOMAGNETIC STORM ALERT<br>
+                            Kp-INDEX: ${STATE.kp} (G${STATE.gScale})
+                        </div>
+                    `;
+                    alertState = true;
+                }
+            } else {
+                if (alertState) {
+                    alertBox.innerHTML = '';
+                    alertState = false;
+                }
+            }
+        }
+
+        // ------------------------------------
+        // VISUALIZATION - RADAR (HELIX Kp)
+        // ------------------------------------
+        function drawRadar() {
+            if (!STATE.history.length) return;
+
+            const W = rdC.width / (window.devicePixelRatio || 1);
+            const H = rdC.height / (window.devicePixelRatio || 1);
+            rdCtx.clearRect(0, 0, W, H);
+
+            const cx = W / 2, cy = H / 2 - 30;
+            const rx = Math.min(W, H) * 0.4;
+            const ry = rx * 0.35;
+
+            const now = new Date();
+            const currHrs = now.getUTCHours() + now.getUTCMinutes() / 60;
+            const rotOffset = Math.PI / 2 - (currHrs / 24) * Math.PI * 2;
+
+            const daysToShow = 7;
+            const oneDay = 24 * 60 * 60 * 1000;
+
+            // Loop Days (Kp is 3-hour bars usually)
+            for (let d = daysToShow - 1; d >= 0; d--) {
+                const dayStart = new Date(now.getTime() - (d + 1) * oneDay);
+                const dayEnd = new Date(now.getTime() - d * oneDay);
+
+                const dayData = STATE.history.filter(p => p.time >= dayStart && p.time < dayEnd);
+
+                const layerY = cy + (d * 12);
+                const layerScale = 1.0 - (d * 0.04);
+                const layerAlpha = 1.0 - (d * 0.1);
+
+                // Ring
+                rdCtx.beginPath();
+                rdCtx.ellipse(cx, layerY, rx * layerScale, ry * layerScale, 0, 0, Math.PI * 2);
+                rdCtx.strokeStyle = (d === 0) ? 'rgba(200,0,255,0.4)' : 'rgba(100,0,150,0.08)';
+                rdCtx.lineWidth = 1;
+                rdCtx.stroke();
+
+                if (d === 0) {
+                    rdCtx.fillStyle = '#d0f'; rdCtx.font = 'bold 9px Space Mono';
+                    rdCtx.fillText("СЬОГОДНІ", cx - rx * layerScale - 40, layerY);
+                }
+
+                // DATA BARS (Kp)
+                // Kp is typically 8 bars per day (3h). The data usually has 3h timestamp.
+                // We draw wide segments.
+
+                if (dayData.length > 0) {
+                    rdCtx.lineCap = 'butt';
+                    dayData.forEach(pt => {
+                        const time = pt.time;
+                        const h = time.getUTCHours() + time.getUTCMinutes() / 60;
+                        const ang = (h / 24) * Math.PI * 2 + rotOffset;
+
+                        // Kp Height: 0-9. Scale nicely.
+                        // Make them distinct blocks.
+                        let baseH = (pt.kp * 8);
+                        if (baseH < 2) baseH = 2;
+
+                        // Width of bar (3 hour arc approx)
+                        // In 2D we iterate a few steps to make a wide arc?
+                        // Or simply draw thick lines.
+
+                        const cos = Math.cos(ang), sin = Math.sin(ang);
+                        const x = cx + cos * rx * layerScale;
+                        const y = cy + sin * ry * layerScale;
+
+                        // Color
+                        let col = '#0fa'; // <4
+                        if (pt.kp >= 4) col = '#fa0';
+                        if (pt.kp >= 5) col = '#f40';
+                        if (pt.kp >= 8) col = '#f04';
+
+                        rdCtx.beginPath();
+                        rdCtx.moveTo(x, y);
+                        rdCtx.lineTo(x, y - baseH);
+                        rdCtx.strokeStyle = col;
+                        rdCtx.lineWidth = 4; // Kp bars are chunky
+                        rdCtx.globalAlpha = (d === 0) ? layerAlpha : layerAlpha * 0.3;
+                        rdCtx.stroke();
+                        rdCtx.globalAlpha = 1;
+
+                        // Top Dot for high values
+                        if (pt.kp >= 5) {
+                            rdCtx.fillStyle = '#fff';
+                            rdCtx.fillRect(x - 1, y - baseH - 2, 2, 2);
+                        }
+                    });
+                }
+            }
+
+            // Time Ticks
+            for (let i = 0; i < 24; i += 6) {
+                const ang = (i / 24) * Math.PI * 2 + rotOffset;
+                const cos = Math.cos(ang), sin = Math.sin(ang);
+                const rxT = rx * 1.1, ryT = ry * 1.1;
+                rdCtx.fillStyle = '#fff'; rdCtx.font = '10px Space Mono';
+                rdCtx.fillText(`${i.toString().padStart(2, '0')}:00`, cx + cos * rxT - 10, cy + sin * ryT);
+            }
+
+            // Scanner
+            rdCtx.beginPath();
+            rdCtx.moveTo(cx, cy + ry);
+            rdCtx.lineTo(cx, cy + ry + ((daysToShow - 1) * 12));
+            rdCtx.strokeStyle = '#d0f'; rdCtx.setLineDash([4, 4]); rdCtx.stroke(); rdCtx.setLineDash([]);
+        }
+
+        // ------------------------------------
+        // VISUALIZATION - AURORA GLOBE
+        // ------------------------------------
+        function drawAurora() {
+            const w = arC.width / (window.devicePixelRatio || 1);
+            const h = arC.height / (window.devicePixelRatio || 1);
+            arCtx.clearRect(0, 0, w, h);
+
+            const cx = w / 2, cy = h / 2;
+            const t = performance.now() * 0.001;
+
+            // Globe Base
+            arCtx.beginPath(); arCtx.arc(cx, cy, 50, 0, Math.PI * 2);
+            arCtx.fillStyle = '#012'; arCtx.fill(); // Dark Earth
+
+            // Aurora Ring (North)
+            // Radius and Intensity depend on Power/Kp
+            const baseR = 20;
+            const activityR = STATE.kp * 2.5; // Expands South
+
+            // Draw dynamic "Green Fire" ring
+            const segments = 60;
+            arCtx.globalCompositeOperation = 'screen';
+
+            for (let i = 0; i < segments; i++) {
+                const a = (i / segments) * Math.PI * 2 + t * 0.2;
+                // Noise
+                const n = Math.sin(i * 10 + t * 2) * 5;
+
+                const rInner = baseR;
+                const rOuter = baseR + activityR + 5 + n;
+
+                const x1 = cx + Math.cos(a) * rInner;
+                const y1 = cy + Math.sin(a) * rInner * 0.4; // Tilt
+                const x2 = cx + Math.cos(a) * rOuter;
+                const y2 = cy + Math.sin(a) * rOuter * 0.4; // Tilt
+
+                // Color ramp: Green base -> Red tops if Storm
+                const grad = arCtx.createLinearGradient(x1, y1, x2, y2);
+                grad.addColorStop(0, 'rgba(0,0,0,0)');
+                if (STATE.kp > 5) {
+                    grad.addColorStop(0.4, 'rgba(0, 255, 100, 0.8)');
+                    grad.addColorStop(1, 'rgba(255, 0, 100, 0.6)');
+                } else {
+                    grad.addColorStop(0.5, 'rgba(0, 255, 150, 0.6)');
+                    grad.addColorStop(1, 'rgba(0, 255, 150, 0)');
+                }
+
+                arCtx.beginPath();
+                arCtx.moveTo(cx, cy - 30); // Project from Pole?
+                // Actually slice-based
+                arCtx.moveTo(x1, y1 - 15); // Draw "curtains" upwards?
+                arCtx.lineTo(x2, y2 - 15);
+                arCtx.lineTo(x2, y2 - 35 - n);
+                arCtx.lineTo(x1, y1 - 35);
+
+                arCtx.fillStyle = grad;
+                arCtx.fill();
+            }
+
+            arCtx.globalCompositeOperation = 'source-over';
+
+            // Globe Overlay (Night side text?)
+            arCtx.fillStyle = '#fff'; arCtx.font = '6px monospace';
+            arCtx.fillText('N.POLE', cx - 10, cy);
+        }
+
+        function drawBackground() {
+            bgCtx.fillStyle = '#020005'; bgCtx.fillRect(0, 0, bgC.width, bgC.height);
+            // Purple Stars
+            bgCtx.fillStyle = 'rgba(200, 0, 255, 0.3)';
+            const t = performance.now() * 0.0001;
+            for (let i = 0; i < 80; i++) {
+                const x = (Math.sin(i * 99 + t) * 0.5 + 0.5) * bgC.width;
+                const y = (Math.cos(i * 23 + t) * 0.5 + 0.5) * bgC.height;
+                bgCtx.fillRect(x, y, 1, 1);
+            }
+        }
+
+        function animLoop() {
+            drawBackground();
+            drawRadar();
+            drawAurora();
+
+            const n = new Date();
+            document.getElementById('clock-overlay').innerText = n.toISOString().split('.')[0] + " Z";
+            requestAnimationFrame(animLoop);
+        }
+
+        // INIT
+        fetchData();
+        resize();
+        setInterval(fetchData, 60000);
+        animLoop();
+
+    </script>
+</body>
+
+</html>
