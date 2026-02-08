@@ -498,20 +498,18 @@
     <div id="clock-overlay">INIT</div>
 
     <script>
-        const PROXY = 'https://corsproxy.io/?';
         const NOAA_K_REALTIME = 'https://services.swpc.noaa.gov/products/noaa-planetary-k-index.json';
         const NOAA_PLASMA_7D = 'https://services.swpc.noaa.gov/products/solar-wind/plasma-7-day.json';
         const NOAA_MAG_7D = 'https://services.swpc.noaa.gov/products/solar-wind/mag-7-day.json';
-        // Forecasted Kp could be used, but we use realtime estimated K for "Now"
 
         // STATE
         const STATE = {
             kp: 0,
-            power: 0, // Hemispheric power
+            power: 0,
             bz: 0,
             wind: 0,
             gScale: 0,
-            history: [], // {time, kp}
+            history: [],
             status: 'QUIET'
         };
 
@@ -523,16 +521,10 @@
         function resize() {
             const r = window.devicePixelRatio || 1;
             bgC.width = window.innerWidth * r; bgC.height = window.innerHeight * r;
-
             const box = document.querySelector('.radar-box');
-            if (box) {
-                rdC.width = box.clientWidth * r; rdC.height = box.clientHeight * r;
-            }
+            if (box) { rdC.width = box.clientWidth * r; rdC.height = box.clientHeight * r; }
             const aBox = document.querySelector('.aurora-box');
-            if (aBox) {
-                arC.width = aBox.clientWidth * r; arC.height = aBox.clientHeight * r;
-            }
-
+            if (aBox) { arC.width = aBox.clientWidth * r; arC.height = aBox.clientHeight * r; }
             bgCtx.scale(r, r); rdCtx.scale(r, r); arCtx.scale(r, r);
         }
         window.addEventListener('resize', resize);
@@ -540,31 +532,23 @@
         // DATA FETCH
         async function fetchData() {
             try {
-                // Fetch Realtime Kp (NOAA Planetary K)
-                const rKp = await fetch(NOAA_K_REALTIME);
-                const kpRaw = await rKp.json(); // [time, kp, a_running, station_count]
-
-                // Fetch Wind for Context
-                const rPl = await fetch(NOAA_PLASMA_7D);
+                const [rKp, rPl, rMg] = await Promise.all([
+                    fetch(NOAA_K_REALTIME),
+                    fetch(NOAA_PLASMA_7D),
+                    fetch(NOAA_MAG_7D)
+                ]);
+                const kpRaw = await rKp.json();
                 const plRaw = await rPl.json();
-
-                const rMg = await fetch(NOAA_MAG_7D);
                 const mgRaw = await rMg.json();
 
-                // Process Latest Kp
-                // NOAA Kp is usually 3-hour blocks, but lists updates.
-                // Format: [time_tag, kp, a_running, station_count]
                 const latestK = kpRaw[kpRaw.length - 1];
                 STATE.kp = parseFloat(latestK[1]);
 
-                // Process Wind/Mag
                 const latestP = plRaw[plRaw.length - 1];
                 const latestM = mgRaw[mgRaw.length - 1];
                 STATE.wind = parseFloat(latestP[2]);
                 STATE.bz = parseFloat(latestM[3]);
 
-                // Estimate G-Scale
-                // G1=Kp5, G2=Kp6, G3=Kp7, G4=Kp8, G5=Kp9
                 if (STATE.kp >= 9) STATE.gScale = 5;
                 else if (STATE.kp >= 8) STATE.gScale = 4;
                 else if (STATE.kp >= 7) STATE.gScale = 3;
@@ -572,28 +556,20 @@
                 else if (STATE.kp >= 5) STATE.gScale = 1;
                 else STATE.gScale = 0;
 
-                // Estimate Power (GW) - Rough correlation to Kp
-                // Kp 0 ~ 5-10GW, Kp 9 ~ 300GW+
-                // Power map: 0->5, 1->15, 2->30, 3->50, 4->80, 5->120...
                 const k = Math.round(STATE.kp);
                 const gwMap = [8, 15, 25, 40, 65, 90, 150, 250, 400, 600];
                 STATE.power = gwMap[k] || 10;
 
-                // Build History for Radar (Kp over 7 days is sparse, usually every 3h)
-                // We need to interpolate or just show blocks.
-                // NOAA K-index json has good history length?
-                // It usually has last few days. 
-                // Let's use it as is.
                 const history = [];
-                // Reverse iterate to fill
                 for (let i = 1; i < kpRaw.length; i++) {
                     const row = kpRaw[i];
-                    history.push({
-                        time: new Date(row[0]),
-                        kp: parseFloat(row[1])
-                    });
+                    if (!row[0]) continue;
+                    const timeStr = row[0].replace(' ', 'T') + 'Z';
+                    const time = new Date(timeStr);
+                    if (isNaN(time.getTime())) continue;
+                    history.push({ time, kp: parseFloat(row[1]) });
                 }
-                STATE.history = history;
+                STATE.history = history.sort((a, b) => a.time - b.time);
 
                 updateHUD();
                 updateInfo();
@@ -602,7 +578,6 @@
 
             } catch (e) {
                 console.error("Data Fetch Error", e);
-                // Fallback
                 if (STATE.history.length === 0) {
                     STATE.kp = 2; STATE.wind = 450; STATE.bz = -3;
                 }
@@ -612,8 +587,6 @@
         function updateHUD() {
             const kEl = document.getElementById('val-kp');
             kEl.innerText = STATE.kp.toFixed(1);
-
-            // Color code Kp
             if (STATE.kp >= 5) kEl.className = 'hud-val kp-ext';
             else if (STATE.kp >= 4) kEl.className = 'hud-val kp-high';
             else kEl.className = 'hud-val kp-low';
@@ -622,7 +595,6 @@
             document.getElementById('val-bz').innerText = STATE.bz.toFixed(1);
             document.getElementById('val-wind').innerText = STATE.wind.toFixed(0);
 
-            // G-Scale display
             const gEl = document.getElementById('val-gscale');
             if (STATE.gScale > 0) {
                 gEl.innerText = 'G' + STATE.gScale;
@@ -634,15 +606,13 @@
                 gEl.style.textShadow = 'none';
             }
 
-            // Est DST (Rough)
-            const dst = (STATE.kp * -15) + 10; // Very rough approx
+            const dst = (STATE.kp * -15) + 10;
             document.getElementById('val-dst').innerText = `~${dst.toFixed(0)}`;
         }
 
         function updateInfo() {
             const desc = document.getElementById('status-desc-text');
             const list = document.getElementById('impact-list');
-
             let txt = '', impacts = [];
 
             if (STATE.kp >= 6) {
@@ -662,7 +632,6 @@
                 impacts = ["Без загроз", "Аврора лише на полюсах"];
                 desc.style.color = '#0fa';
             }
-
             desc.innerText = txt;
             list.innerHTML = impacts.map(i => `<li>${i}</li>`).join('');
         }
@@ -670,19 +639,14 @@
         function generateStats() {
             const p = document.getElementById('stats-panel');
             let html = '<div class="cat-title"><span>RECENT MAX Kp</span> <span>VALUE</span></div>';
-
-            // Show last few readings reversed
             const rec = [...STATE.history].reverse().slice(0, 7);
-
             rec.forEach(r => {
                 const dateStr = r.time.toISOString().split('T');
                 const tStr = dateStr[1].slice(0, 5);
                 const dStr = dateStr[0].slice(5);
-
                 const v = r.kp;
                 let c = '#0fa';
                 if (v >= 4) c = '#fa0'; if (v >= 5) c = '#f40'; if (v >= 7) c = '#f04';
-
                 html += `<div class="stat-row">
                     <span class="stat-date">${dStr} ${tStr}</span>
                     <span style="color:${c}; font-weight:bold">${v}</span>
@@ -706,10 +670,7 @@
                     alertState = true;
                 }
             } else {
-                if (alertState) {
-                    alertBox.innerHTML = '';
-                    alertState = false;
-                }
+                if (alertState) { alertBox.innerHTML = ''; alertState = false; }
             }
         }
 
@@ -718,7 +679,6 @@
         // ------------------------------------
         function drawRadar() {
             if (!STATE.history.length) return;
-
             const W = rdC.width / (window.devicePixelRatio || 1);
             const H = rdC.height / (window.devicePixelRatio || 1);
             rdCtx.clearRect(0, 0, W, H);
@@ -731,21 +691,14 @@
             const currHrs = now.getUTCHours() + now.getUTCMinutes() / 60;
             const rotOffset = Math.PI / 2 - (currHrs / 24) * Math.PI * 2;
 
-            const daysToShow = 7;
-            const oneDay = 24 * 60 * 60 * 1000;
-
-            // Loop Days (Kp is 3-hour bars usually)
-            for (let d = daysToShow - 1; d >= 0; d--) {
-                const dayStart = new Date(now.getTime() - (d + 1) * oneDay);
-                const dayEnd = new Date(now.getTime() - d * oneDay);
-
+            for (let d = 6; d >= 0; d--) {
+                const dayStart = new Date(now.getTime() - (d + 1) * 24 * 60 * 60 * 1000);
+                const dayEnd = new Date(now.getTime() - d * 24 * 60 * 60 * 1000);
                 const dayData = STATE.history.filter(p => p.time >= dayStart && p.time < dayEnd);
-
                 const layerY = cy + (d * 12);
                 const layerScale = 1.0 - (d * 0.04);
                 const layerAlpha = 1.0 - (d * 0.1);
 
-                // Ring
                 rdCtx.beginPath();
                 rdCtx.ellipse(cx, layerY, rx * layerScale, ry * layerScale, 0, 0, Math.PI * 2);
                 rdCtx.strokeStyle = (d === 0) ? 'rgba(200,0,255,0.4)' : 'rgba(100,0,150,0.08)';
@@ -753,72 +706,66 @@
                 rdCtx.stroke();
 
                 if (d === 0) {
-                    rdCtx.fillStyle = '#d0f'; rdCtx.font = 'bold 9px Space Mono';
-                    rdCtx.fillText("СЬОГОДНІ", cx - rx * layerScale - 40, layerY);
+                    rdCtx.font = 'bold 12px Space Mono';
+                    rdCtx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+                    rdCtx.textAlign = 'center';
+                    [0, 6, 12, 18].forEach(hr => {
+                        const ang = (hr / 24) * Math.PI * 2 + rotOffset;
+                        const tx = cx + Math.cos(ang) * (rx * 1.15);
+                        const ty = layerY + Math.sin(ang) * (ry * 1.15);
+                        rdCtx.fillText(hr.toString().padStart(2, '0') + ":00", tx, ty);
+                    });
+                    rdCtx.textAlign = 'start';
                 }
 
-                // DATA BARS (Kp)
-                // Kp is typically 8 bars per day (3h). The data usually has 3h timestamp.
-                // We draw wide segments.
-
                 if (dayData.length > 0) {
-                    rdCtx.lineCap = 'butt';
                     dayData.forEach(pt => {
-                        const time = pt.time;
-                        const h = time.getUTCHours() + time.getUTCMinutes() / 60;
+                        const h = pt.time.getUTCHours() + pt.time.getUTCMinutes() / 60;
                         const ang = (h / 24) * Math.PI * 2 + rotOffset;
-
-                        // Kp Height: 0-9. Scale nicely.
-                        // Make them distinct blocks.
-                        let baseH = (pt.kp * 8);
+                        let baseH = (pt.kp * 10);
                         if (baseH < 2) baseH = 2;
-
-                        // Width of bar (3 hour arc approx)
-                        // In 2D we iterate a few steps to make a wide arc?
-                        // Or simply draw thick lines.
-
-                        const cos = Math.cos(ang), sin = Math.sin(ang);
-                        const x = cx + cos * rx * layerScale;
-                        const y = cy + sin * ry * layerScale;
-
-                        // Color
-                        let col = '#0fa'; // <4
-                        if (pt.kp >= 4) col = '#fa0';
-                        if (pt.kp >= 5) col = '#f40';
-                        if (pt.kp >= 8) col = '#f04';
-
+                        const x = cx + Math.cos(ang) * rx * layerScale;
+                        const y = layerY + Math.sin(ang) * ry * layerScale;
+                        let col = '#0fa'; if (pt.kp >= 4) col = '#fa0'; if (pt.kp >= 5) col = '#f40'; if (pt.kp >= 8) col = '#f04';
                         rdCtx.beginPath();
                         rdCtx.moveTo(x, y);
                         rdCtx.lineTo(x, y - baseH);
                         rdCtx.strokeStyle = col;
-                        rdCtx.lineWidth = 4; // Kp bars are chunky
+                        rdCtx.lineWidth = 6;
                         rdCtx.globalAlpha = (d === 0) ? layerAlpha : layerAlpha * 0.3;
                         rdCtx.stroke();
                         rdCtx.globalAlpha = 1;
-
-                        // Top Dot for high values
-                        if (pt.kp >= 5) {
-                            rdCtx.fillStyle = '#fff';
-                            rdCtx.fillRect(x - 1, y - baseH - 2, 2, 2);
-                        }
                     });
                 }
             }
 
-            // Time Ticks
-            for (let i = 0; i < 24; i += 6) {
-                const ang = (i / 24) * Math.PI * 2 + rotOffset;
-                const cos = Math.cos(ang), sin = Math.sin(ang);
-                const rxT = rx * 1.1, ryT = ry * 1.1;
-                rdCtx.fillStyle = '#fff'; rdCtx.font = '10px Space Mono';
-                rdCtx.fillText(`${i.toString().padStart(2, '0')}:00`, cx + cos * rxT - 10, cy + sin * ryT);
-            }
+            // NOW MARKER (REPOSITIONED TO BOTTOM - ЗАРАЗ В НИЗ)
+            const bx = cx, by = cy + ry;
+            const pulse = 1 + Math.sin(performance.now() * 0.01) * 0.2;
+            rdCtx.beginPath(); rdCtx.arc(bx, by, 7 * pulse, 0, Math.PI * 2);
+            rdCtx.strokeStyle = '#d0f'; rdCtx.lineWidth = 2; rdCtx.stroke();
+            rdCtx.beginPath(); rdCtx.arc(bx, by, 2, 0, Math.PI * 2);
+            rdCtx.fillStyle = '#fff'; rdCtx.fill();
+
+            // CONCISE REPORT NEAR MARKER
+            let shortStatus = STATE.kp >= 5 ? "ШТОРМ" : STATE.kp >= 4 ? "ЗБУРЕНО" : "СПОКІЙНО";
+            let shortCol = STATE.kp >= 6 ? "#f04" : STATE.kp >= 4 ? "#fa0" : "#0fa";
+
+            rdCtx.fillStyle = shortCol; rdCtx.font = 'bold 10px Space Mono';
+            rdCtx.fillText("ЗАРАЗ", bx - 14, by + 18);
+            rdCtx.fillStyle = '#eaf'; rdCtx.font = '9px Courier New';
+            rdCtx.fillText(shortStatus, bx - 18, by + 30);
+            rdCtx.fillStyle = '#fff';
+            rdCtx.fillText(`Kp ${STATE.kp.toFixed(1)}`, bx - 16, by + 42);
 
             // Scanner
             rdCtx.beginPath();
+            rdCtx.setLineDash([4, 4]);
             rdCtx.moveTo(cx, cy + ry);
-            rdCtx.lineTo(cx, cy + ry + ((daysToShow - 1) * 12));
-            rdCtx.strokeStyle = '#d0f'; rdCtx.setLineDash([4, 4]); rdCtx.stroke(); rdCtx.setLineDash([]);
+            rdCtx.lineTo(cx, cy + ry + (6 * 12));
+            rdCtx.strokeStyle = 'rgba(200, 0, 255, 0.4)';
+            rdCtx.stroke();
+            rdCtx.setLineDash([]);
         }
 
         // ------------------------------------
@@ -828,74 +775,37 @@
             const w = arC.width / (window.devicePixelRatio || 1);
             const h = arC.height / (window.devicePixelRatio || 1);
             arCtx.clearRect(0, 0, w, h);
-
-            const cx = w / 2, cy = h / 2;
-            const t = performance.now() * 0.001;
-
-            // Globe Base
+            const cx = w / 2, cy = h / 2, t = performance.now() * 0.001;
             arCtx.beginPath(); arCtx.arc(cx, cy, 50, 0, Math.PI * 2);
-            arCtx.fillStyle = '#012'; arCtx.fill(); // Dark Earth
-
-            // Aurora Ring (North)
-            // Radius and Intensity depend on Power/Kp
-            const baseR = 20;
-            const activityR = STATE.kp * 2.5; // Expands South
-
-            // Draw dynamic "Green Fire" ring
+            arCtx.fillStyle = '#012'; arCtx.fill();
+            const activityR = STATE.kp * 3;
             const segments = 60;
             arCtx.globalCompositeOperation = 'screen';
-
             for (let i = 0; i < segments; i++) {
                 const a = (i / segments) * Math.PI * 2 + t * 0.2;
-                // Noise
                 const n = Math.sin(i * 10 + t * 2) * 5;
-
-                const rInner = baseR;
-                const rOuter = baseR + activityR + 5 + n;
-
-                const x1 = cx + Math.cos(a) * rInner;
-                const y1 = cy + Math.sin(a) * rInner * 0.4; // Tilt
-                const x2 = cx + Math.cos(a) * rOuter;
-                const y2 = cy + Math.sin(a) * rOuter * 0.4; // Tilt
-
-                // Color ramp: Green base -> Red tops if Storm
+                const rInner = 20, rOuter = 20 + activityR + 5 + n;
+                const x1 = cx + Math.cos(a) * rInner, y1 = cy + Math.sin(a) * rInner * 0.4;
+                const x2 = cx + Math.cos(a) * rOuter, y2 = cy + Math.sin(a) * rOuter * 0.4;
                 const grad = arCtx.createLinearGradient(x1, y1, x2, y2);
                 grad.addColorStop(0, 'rgba(0,0,0,0)');
-                if (STATE.kp > 5) {
-                    grad.addColorStop(0.4, 'rgba(0, 255, 100, 0.8)');
-                    grad.addColorStop(1, 'rgba(255, 0, 100, 0.6)');
-                } else {
-                    grad.addColorStop(0.5, 'rgba(0, 255, 150, 0.6)');
-                    grad.addColorStop(1, 'rgba(0, 255, 150, 0)');
-                }
-
-                arCtx.beginPath();
-                arCtx.moveTo(cx, cy - 30); // Project from Pole?
-                // Actually slice-based
-                arCtx.moveTo(x1, y1 - 15); // Draw "curtains" upwards?
-                arCtx.lineTo(x2, y2 - 15);
-                arCtx.lineTo(x2, y2 - 35 - n);
-                arCtx.lineTo(x1, y1 - 35);
-
-                arCtx.fillStyle = grad;
-                arCtx.fill();
+                if (STATE.kp >= 5) { grad.addColorStop(0.4, 'rgba(0, 255, 100, 0.8)'); grad.addColorStop(1, 'rgba(255, 0, 100, 0.6)'); }
+                else { grad.addColorStop(0.5, 'rgba(0, 255, 150, 0.6)'); grad.addColorStop(1, 'rgba(0, 255, 150, 0)'); }
+                arCtx.beginPath(); arCtx.moveTo(x1, y1 - 15); arCtx.lineTo(x2, y2 - 15); arCtx.lineTo(x2, y2 - 35 - n); arCtx.lineTo(x1, y1 - 35);
+                arCtx.fillStyle = grad; arCtx.fill();
             }
-
             arCtx.globalCompositeOperation = 'source-over';
-
-            // Globe Overlay (Night side text?)
             arCtx.fillStyle = '#fff'; arCtx.font = '6px monospace';
-            arCtx.fillText('N.POLE', cx - 10, cy);
+            arCtx.fillText('N.POLE', cx - 18, cy);
         }
 
         function drawBackground() {
             bgCtx.fillStyle = '#020005'; bgCtx.fillRect(0, 0, bgC.width, bgC.height);
-            // Purple Stars
-            bgCtx.fillStyle = 'rgba(200, 0, 255, 0.3)';
             const t = performance.now() * 0.0001;
             for (let i = 0; i < 80; i++) {
                 const x = (Math.sin(i * 99 + t) * 0.5 + 0.5) * bgC.width;
                 const y = (Math.cos(i * 23 + t) * 0.5 + 0.5) * bgC.height;
+                bgCtx.fillStyle = 'rgba(200, 0, 255, 0.3)';
                 bgCtx.fillRect(x, y, 1, 1);
             }
         }
@@ -904,18 +814,18 @@
             drawBackground();
             drawRadar();
             drawAurora();
-
             const n = new Date();
-            document.getElementById('clock-overlay').innerText = n.toISOString().split('.')[0] + " Z";
+            const utc = n.toISOString().split('.')[0].replace('T', ' ') + " UTC";
+            const loc = n.toLocaleTimeString('uk-UA');
+            document.getElementById('clock-overlay').innerHTML = `
+                <div style="font-size:8px; color:#c0f; margin-bottom:2px;">GEOMAGNETIC TIME HUB</div>
+                <div style="margin-bottom:2px;">${utc}</div>
+                <div style="color:#fff; font-size:11px;">${loc} (LOCAL)</div>
+            `;
             requestAnimationFrame(animLoop);
         }
 
-        // INIT
-        fetchData();
-        resize();
-        setInterval(fetchData, 60000);
-        animLoop();
-
+        fetchData(); resize(); setInterval(fetchData, 60000); animLoop();
     </script>
 </body>
 
